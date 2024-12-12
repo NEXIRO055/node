@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>메모장 애플리케이션</title>
+</head>
+<body>
+    <h1>메모장 애플리케이션</h1>
+    
+    <!-- 회원가입 / 로그인 폼 -->
+    <div id="auth-section">
+        <h2>회원가입 또는 로그인</h2>
+        <form id="auth-form">
+            <input type="text" id="username" placeholder="아이디" required><br>
+            <input type="password" id="password" placeholder="비밀번호" required><br>
+            <button type="submit">로그인/회원가입</button>
+        </form>
+    </div>
+
+    <!-- 메모장 -->
+    <div id="note-section" style="display: none;">
+        <h2>메모장</h2>
+        <textarea id="note" rows="10" cols="30" placeholder="메모를 입력하세요"></textarea><br>
+        <button id="save-note">메모 저장</button>
+        <button id="logout">로그아웃</button>
+    </div>
+
+    <script>
+        // IndexedDB 초기화
+        const dbName = "MemoAppDB";
+        const storeName = "users";
+        let db;
+
+        // DB 열기 또는 생성
+        function openDB() {
+            const request = indexedDB.open(dbName, 1);
+            
+            request.onupgradeneeded = function(event) {
+                db = event.target.result;
+                if (!db.objectStoreNames.contains(storeName)) {
+                    db.createObjectStore(storeName, { keyPath: "username" });
+                }
+            };
+
+            request.onsuccess = function(event) {
+                db = event.target.result;
+            };
+
+            request.onerror = function(event) {
+                alert("DB 열기 실패!");
+            };
+        }
+
+        openDB();
+
+        // 로그인 및 회원가입 처리
+        document.getElementById("auth-form").addEventListener("submit", function(event) {
+            event.preventDefault();
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+
+            const transaction = db.transaction([storeName], "readwrite");
+            const store = transaction.objectStore(storeName);
+            const getRequest = store.get(username);
+
+            getRequest.onsuccess = function() {
+                if (getRequest.result) {
+                    if (getRequest.result.password === password) {
+                        alert("로그인 성공!");
+                        showNoteSection(username);
+                    } else {
+                        alert("비밀번호가 틀렸습니다.");
+                    }
+                } else {
+                    const newUser = { username: username, password: password };
+                    store.add(newUser);
+                    alert("회원가입 성공!");
+                    showNoteSection(username);
+                }
+            };
+
+            getRequest.onerror = function() {
+                alert("DB 조회 실패!");
+            };
+        });
+
+        // 메모장 화면 표시
+        function showNoteSection(username) {
+            document.getElementById("auth-section").style.display = "none";
+            document.getElementById("note-section").style.display = "block";
+            loadNote(username);
+        }
+
+        // 메모 저장
+        document.getElementById("save-note").addEventListener("click", function() {
+            const username = document.getElementById("username").value;
+            const noteContent = document.getElementById("note").value;
+
+            const transaction = db.transaction([storeName], "readwrite");
+            const store = transaction.objectStore(storeName);
+            const getRequest = store.get(username);
+
+            getRequest.onsuccess = function() {
+                const user = getRequest.result;
+                user.note = noteContent;
+                store.put(user);
+                alert("메모가 저장되었습니다.");
+            };
+
+            getRequest.onerror = function() {
+                alert("메모 저장 실패!");
+            };
+        });
+
+        // 메모 로드
+        function loadNote(username) {
+            const transaction = db.transaction([storeName], "readonly");
+            const store = transaction.objectStore(storeName);
+            const getRequest = store.get(username);
+
+            getRequest.onsuccess = function() {
+                const user = getRequest.result;
+                if (user && user.note) {
+                    document.getElementById("note").value = user.note;
+                }
+            };
+
+            getRequest.onerror = function() {
+                alert("메모 로드 실패!");
+            };
+        }
+
+        // 로그아웃 처리
+        document.getElementById("logout").addEventListener("click", function() {
+            document.getElementById("auth-section").style.display = "block";
+            document.getElementById("note-section").style.display = "none";
+            document.getElementById("username").value = "";
+            document.getElementById("password").value = "";
+        });
+    </script>
+</body>
+</html>
